@@ -31,6 +31,7 @@ for i, paradigm_shift in enumerate(potential_paradigm_shifts):
 #TODO: add ability to add custom paradigm shifts
 #TODO: let people rate the impact of paradigm shifts; adapt the model accordingly
 
+st.write('---')
 #%%
 def get_prediction_dist(selected_years: List[int], num_yrs_forward: int = 20) -> List[float]:
     # prob of no success during t time = (1+t/T)^{-S} (T = time since first paradigm shift, S = number of paradigm shifts)
@@ -49,12 +50,18 @@ def get_prediction_dist(selected_years: List[int], num_yrs_forward: int = 20) ->
     # distribution over the next num_yrs_forward years, dummy dist for now
     return pd.DataFrame({
         'Year': range(current_year, current_year+num_yrs_forward),
-        'Probability': [round(p, 2) for p in prob_shift], # round to 2 decimal places
-        'Cumulative Probability': [round(p, 2) for p in prob_shift_cumulative],
+        'Probability': [round(p, 3) for p in prob_shift], # round to 3 decimal places
+        'Cumulative Probability': [round(p, 3) for p in prob_shift_cumulative],
     })
 
 #%%
-data = get_prediction_dist(selected_years)
+col1, col2 = st.columns(2)
+with col1:
+    show_cum = st.checkbox('Show cumulative probability')
+with col2:
+    num_yrs_forward = st.slider('Number of years to predict', 1, 100, 20)
+
+data = get_prediction_dist(selected_years, num_yrs_forward)
 
 # Create the plot using Plotly
 fig = go.Figure()
@@ -62,10 +69,20 @@ fig = go.Figure()
 # Add a bar chart for yearly probabilities
 fig.add_trace(go.Bar(x=data['Year'], y=data['Probability'], name='Probability'))
 
-# Add a line chart for cumulative probabilities
-fig.add_trace(go.Scatter(x=data['Year'], y=data['Cumulative Probability'], mode='lines', name='Cumulative Probability'))
+if show_cum:
+    # Add a line chart for cumulative probabilities
+    fig.add_trace(go.Scatter(x=data['Year'], y=data['Cumulative Probability'],
+                             mode='lines', name='Cumulative Probability'))
 
 # Render the Plotly chart in Streamlit
 st.plotly_chart(fig)
 
 #%%
+# print the year when the cumulative probability of a paradigm shift is 10%, 25%, 50%, 75%, 90%
+cummulative_threshs = []
+for p in [0.1, 0.25, 0.5, 0.75, 0.9]:
+    try:
+        cummulative_threshs.append((p, data[data['Cumulative Probability'] >= p]['Year'].iloc[0]))
+    except IndexError:
+        pass
+st.write('\n'.join([f"- {p*100}% chance of a paradigm shift by {y}" for p, y in cummulative_threshs]))
