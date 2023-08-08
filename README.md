@@ -4,7 +4,8 @@ of machine learning, and use this to create a predictive model of when we are
 likely to see the next ML paradigm shift.
 
 This code is currently a bit of a mess — I was rapidly prototyping and not focusing
-on keeping things neat and tidy. If anything isn't clear, please ask.
+on keeping things neat and tidy. It's all a work in progress right now.
+If anything isn't clear, please ask.
 
 **IMPORTANT NOTE: the files with the actual data are currently not included in this repo**
 
