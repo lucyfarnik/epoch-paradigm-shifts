@@ -1,4 +1,8 @@
 # Paradigm shifts in ML
+The purpose of this project is to identify a list of paradigm shifts in the history
+of machine learning, and use this to create a predictive model of when we are
+likely to see the next ML paradigm shift.
+
 This code is currently a bit of a mess — I was rapidly prototyping and not focusing
 on keeping things neat and tidy. If anything isn't clear, please ask.
 
