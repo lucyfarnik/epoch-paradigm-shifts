@@ -1,0 +1,40 @@
+NeurIPS
+Conference on Neural Information Processing Systems
+ICML
+International Conference on Machine Learning
+CVPR
+Conference on Computer Vision and Pattern Recognition
+ICLR
+International Conference on Learning Representations
+ACL
+Association for Computational Linguistics
+AAAI
+Association for the Advancement of Artificial Intelligence
+IJCAI
+International Joint Conference on Artificial Intelligence
+ECCV
+European Conference on Computer Vision
+ICCV
+International Conference on Computer Vision
+AISTATS
+International Conference on Artificial Intelligence and Statistics
+COLT
+Conference on Learning Theory
+UAI
+Conference on Uncertainty in Artificial Intelligence
+KDD
+Knowledge Discovery and Data Mining
+MLSys
+Conference on Machine Learning and Systems
+WiML
+Women in Machine Learning Workshop
+ACML
+Asian Conference on Machine Learning
+NIPS
+Neural Information Processing Systems
+RecSys
+Conference on Recommender Systems
+EMNLP
+Conference on Empirical Methods in Natural Language Processing
+NAACL
+North American Chapter of the Association for Computational Linguistics
