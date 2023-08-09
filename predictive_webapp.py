@@ -14,20 +14,36 @@ st.write("""
          """)
 
 #%%
-potential_paradigm_shifts = [ #TODO: add more
-    'Transformers (2017)',
-    'Generative Adversarial Networks (2014)',
-    'Deep Learning (2006)',
-    'Support Vector Machines (1995)',
-    'Backpropagation (1986)',
-]
+if 'paradigm_shifts' not in st.session_state:
+    st.session_state.paradigm_shifts = [ #TODO: add more
+        'Transformers (2017)',
+        'Generative Adversarial Networks (2014)',
+        'Deep Learning (2006)',
+        'Support Vector Machines (1995)',
+        'Backpropagation (1986)',
+    ]
+
+
+# ability to add custom paradigm shifts
+col1, col2 = st.columns([5, 1])
+with col1:
+    custom_paradigm_shift = st.text_input('Add custom paradigm shift (then press the Add button)')
+with col2:
+    st.write('## ')
+    if st.button('Add'):
+        try:
+            year = int(custom_paradigm_shift[-5:-1])
+            st.session_state.paradigm_shifts.append(custom_paradigm_shift)
+        except ValueError:
+            st.error('Please enter a valid year in the brackets')
 
 selected_years = []
 
 # list of checkboxes
-for i, paradigm_shift in enumerate(potential_paradigm_shifts):
-    if st.checkbox(paradigm_shift, value=True, key=i):
+for paradigm_shift in st.session_state.paradigm_shifts:
+    if st.checkbox(paradigm_shift, value=True, key=paradigm_shift):
         selected_years.append(int(paradigm_shift[-5:-1]))
+
 #TODO: add ability to add custom paradigm shifts
 #TODO: let people rate the impact of paradigm shifts; adapt the model accordingly
 
@@ -42,7 +58,7 @@ def get_prediction_dist(selected_years: List[int], num_yrs_forward: int = 20) ->
 
     # compute the probabilities
     prob_shift_cumulative = [1 - (1+i/sample_time_period)**(-n_shifts)
-                             for i in range(num_yrs_forward)]
+                             for i in range(1, num_yrs_forward+1)]
     prob_shift = [prob_shift_cumulative[0]] + [
         prob_shift_cumulative[i] - prob_shift_cumulative[i-1]
         for i in range(1, num_yrs_forward)]
@@ -86,3 +102,5 @@ for p in [0.1, 0.25, 0.5, 0.75, 0.9]:
     except IndexError:
         pass
 st.write('\n'.join([f"- {p*100}% chance of a paradigm shift by {y}" for p, y in cummulative_threshs]))
+
+#%%
