@@ -15,12 +15,16 @@ st.write("""
 
 #%%
 if 'paradigm_shifts' not in st.session_state:
-    st.session_state.paradigm_shifts = [ #TODO: add more
-        'Transformers (2017)',
-        'Generative Adversarial Networks (2014)',
-        'Deep Learning (2006)',
+    st.session_state.paradigm_shifts = [ #TODO: add more, fact check years
+        'Backpropagation (1960)',
+        'Hopfield networks (1982)',
+        'Recurrent Neural Networks (1986)'
+        'Convolutional Neural Networks (1988)',
         'Support Vector Machines (1995)',
-        'Backpropagation (1986)',
+        'Deep Learning (2006)',
+        'Generative Adversarial Networks (2014)',
+        'Transformers (2017)',
+        'Foundation models (2020)'
     ]
 
 
