@@ -22,7 +22,7 @@ if 'paradigm_shifts' not in st.session_state:
     st.session_state.paradigm_shifts = [ #TODO: add more, fact check years
         'Backpropagation (1960)',
         'Hopfield networks (1982)',
-        'Recurrent Neural Networks (1986)'
+        'Recurrent Neural Networks (1986)',
         'Convolutional Neural Networks (1988)',
         'Support Vector Machines (1995)',
         'Deep Learning (2006)',
@@ -78,37 +78,60 @@ def get_prediction_dist(selected_years: List[int], num_yrs_forward: int = 20) ->
         'Cumulative Probability': [round(p, 3) for p in prob_shift_cumulative],
     })
 
+
 #%%
+# Chart options
 col1, col2 = st.columns(2)
 with col1:
-    show_cum = st.checkbox('Show cumulative probability')
+    show_cumulative = st.checkbox('Show cumulative probability')
 with col2:
     num_yrs_forward = st.slider('Number of years to predict', 1, 100, 20)
 
+#%%
+# get the data
 data = get_prediction_dist(selected_years, num_yrs_forward)
 
-# Create the plot using Plotly
-fig = go.Figure()
-
-# Add a bar chart for yearly probabilities
-fig.add_trace(go.Bar(x=data['Year'], y=data['Probability'], name='Probability'))
-
-if show_cum:
-    # Add a line chart for cumulative probabilities
-    fig.add_trace(go.Scatter(x=data['Year'], y=data['Cumulative Probability'],
-                             mode='lines', name='Cumulative Probability'))
-
-# Render the Plotly chart in Streamlit
-st.plotly_chart(fig)
-
 #%%
-# print the year when the cumulative probability of a paradigm shift is 10%, 25%, 50%, 75%, 90%
+# compute when the cumulative probabilities surpass certain thresholds 
 cummulative_threshs = []
 for p in [0.1, 0.25, 0.5, 0.75, 0.9]:
     try:
         cummulative_threshs.append((p, data[data['Cumulative Probability'] >= p]['Year'].iloc[0]))
     except IndexError:
         pass
+#%%
+# Create the plot using Plotly
+fig = go.Figure()
+
+# Add a bar chart for yearly probabilities
+fig.add_trace(go.Bar(x=data['Year'], y=data['Probability'], name='Probability'))
+
+if show_cumulative:
+    # Add a line chart for cumulative probabilities
+    fig.add_trace(go.Scatter(x=data['Year'], y=data['Cumulative Probability'],
+                             mode='lines', name='Cumulative Probability'))
+
+chart_height = 1 if show_cumulative else data['Probability'].max()
+for (prob, year) in cummulative_threshs:
+    fig.add_shape(
+        type='line',
+        yref='y', y0=0, y1=chart_height,
+        xref='x', x0=year, x1=year,
+        line=dict(color='red', width=2, dash='dot'),
+    )
+    fig.add_trace(go.Scatter(
+        x=[year],
+        y=[chart_height+0.005],
+        text=[f"{100*prob:.0f}%"],
+        mode="text",
+        showlegend=False
+    ))
+
+# Render the Plotly chart in Streamlit
+st.plotly_chart(fig)
+
+#%%
+# print the year when the cumulative probability of a paradigm shift reach thresholds
 st.write('\n'.join([f"- {p*100}% chance of a paradigm shift by {y}" for p, y in cummulative_threshs]))
 
 #%%
