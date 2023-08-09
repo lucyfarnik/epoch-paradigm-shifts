@@ -11,6 +11,10 @@ st.write("""
          Select what you consider to be a paradigm shift in the history of ML.
          The app will give you a prediction of when you can expect to see the next
          paradigm shift, based on the [time-invariant Laplace's rule](https://epochai.org/blog/a-time-invariant-version-of-laplace-s-rule).
+
+         Developed by [Lucy Farnik](https://www.linkedin.com/in/lucy-farnik/),
+         [Francesca Sheeka](https://www.linkedin.com/in/fsheeka/),
+         and [Pablo Villalobos](https://www.linkedin.com/in/pablo-villalobos-sanchez/).
          """)
 
 #%%
