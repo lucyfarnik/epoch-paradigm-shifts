@@ -52,14 +52,13 @@ for paradigm_shift in st.session_state.paradigm_shifts:
     if st.checkbox(paradigm_shift, value=True, key=paradigm_shift):
         selected_years.append(int(paradigm_shift[-5:-1]))
 
-#TODO: add ability to add custom paradigm shifts
 #TODO: let people rate the impact of paradigm shifts; adapt the model accordingly
 
 st.write('---')
 #%%
-def get_prediction_dist(selected_years: List[int], num_yrs_forward: int = 20) -> List[float]:
+current_year = datetime.datetime.now().year
+def get_prediction_dist(selected_years: List[int], num_yrs_forward: int = 30) -> List[float]:
     # prob of no success during t time = (1+t/T)^{-S} (T = time since first paradigm shift, S = number of paradigm shifts)
-    current_year = datetime.datetime.now().year
     first_shift = min(selected_years)
     sample_time_period = current_year - first_shift # T in the formula above
     n_shifts = len(selected_years) # S in the formula above
@@ -85,7 +84,7 @@ col1, col2 = st.columns(2)
 with col1:
     show_cumulative = st.checkbox('Show cumulative probability')
 with col2:
-    num_yrs_forward = st.slider('Number of years to predict', 1, 100, 20)
+    num_yrs_forward = st.slider('Number of years to predict', 1, 100, 30)
 
 #%%
 # get the data
@@ -107,6 +106,7 @@ cummulative_threshs = [cummulative_threshs[i]
                             cummulative_threshs[i][1] != cummulative_threshs[i+1][1]]
 
 #%%
+st.write("## Next paradigm shift date")
 # Create the plot using Plotly
 fig = go.Figure()
 
@@ -142,3 +142,24 @@ st.plotly_chart(fig)
 st.write('\n'.join([f"- {p*100}% chance of a paradigm shift by {y}" for p, y in cummulative_threshs]))
 
 #%%
+# show number of paradigm shifts expected by a given year
+num_successes = len(selected_years)
+num_years = current_year - min(selected_years)
+st.write("""
+         ---
+         ## Number of paradigm shifts predicted by a given year
+""")
+num_shifts_by_year = [round(t*num_successes/num_years, 2)
+                      for t in range(num_yrs_forward)]
+
+#%%
+# print the year when the predicted number of paradigm shifts crosses integer thresholds
+num_shifts_thresh_years = []
+num_shifts_thresh = 1
+for year_offset, num_shifts in enumerate(num_shifts_by_year):
+    if num_shifts >= num_shifts_thresh:
+        num_shifts_thresh_years.append((num_shifts_thresh, current_year + year_offset))
+        num_shifts_thresh += 1
+
+st.write('\n'.join([f"- {n} paradigm shifts predicted by {y}" for n, y in num_shifts_thresh_years]))
+# %%
