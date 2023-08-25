@@ -99,6 +99,12 @@ for p in [0.1, 0.25, 0.5, 0.75, 0.9]:
         cummulative_threshs.append((p, data[data['Cumulative Probability'] >= p]['Year'].iloc[0]))
     except IndexError:
         pass
+# if there are multiple cumulative probability values in the same year,
+# only keep the highest one so that they don't visually overlap
+cummulative_threshs = [cummulative_threshs[-1]] + [cummulative_threshs[i]
+                                                   for i in range(len(cummulative_threshs)-1)
+                                                   if cummulative_threshs[i][1] != cummulative_threshs[i+1][1]]
+
 #%%
 # Create the plot using Plotly
 fig = go.Figure()
