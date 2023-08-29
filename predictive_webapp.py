@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import datetime
-from typing import List
+from typing import List, Optional, Callable
 
 #%%
 st.write("""
@@ -55,7 +55,7 @@ for paradigm_shift in st.session_state.paradigm_shifts:
 #TODO: let people rate the impact of paradigm shifts; adapt the model accordingly
 
 #%%
-num_yrs_forward = st.slider('Number of years to predict', 1, 100, 30)
+num_yrs_forward = st.slider('Number of years to predict', 10, 100, 30, 5)
 st.write('---')
 #%%
 current_year = datetime.datetime.now().year
@@ -163,8 +163,47 @@ for year_offset, num_shifts in enumerate(num_shifts_by_year):
 st.write('\n'.join([f"- {n} paradigm shifts predicted by {y}" for n, y in num_shifts_thresh_years]))
 # %%
 st.write("## Probability of seeing a given number of paradigm shifts by year")
+
+def laplace_rule_succ(num_successes: int, num_trials: int) -> float:
+    """
+    Probability of seeing a new paradigm shift in the next year, given that we've
+    seen num_successes paradigm shifts in num_trials years.
+    """
+
+    return (num_successes + 1) / (num_trials + 2)
+
+def laplace_rule_succ_NEW(success_years: List[int],
+                          success_rate_func: Optional[Callable] = None,
+                          year_to_predict: int = None) -> float:
+    """
+    Probability of seeing a new paradigm shift in the next year, given a list of
+    when each paradigm shift occurred.
+
+    success_years: list of years when paradigm shifts occurred
+    success_rate_func: function that takes a year and returns the "success rate",
+        which can be thought of as being proportional to the number of
+        "effective researcher years" (default: constant function that returns 1)
+    year_to_predict: year for which we want to predict the probability of a new
+        paradigm shift (default: either current year + 1 or the year after the
+        last paradigm shift, whichever is later)
+
+    P(Success_t) = r(t) \\frac{\sum r(t_i)x_i + 1}{\sum r(t_i) + 2}
+    """
+    if success_rate_func is None:
+        success_rate_func = lambda _: 1
+    
+    if year_to_predict is None:
+        year_to_predict = max(current_year, max(success_years))+1
+
+    succ_rate_sum_succ = sum([success_rate_func(yr) for yr in success_years])
+    succ_rate_sum = sum([success_rate_func(yr)
+                         for yr in range(min(success_years), year_to_predict)])
+    
+    return success_rate_func(year_to_predict) * (succ_rate_sum_succ + 1) / (succ_rate_sum + 2)
+
 # predict number of paradigm shifts by year using branching
 def branching_distributions(selected_years: List[int],
+                            success_rate_func: Optional[Callable] = None,
                             num_yrs_forward: int = 30) -> List[List[float]]:
     """
     In any given year, how many paradigm shifts will we have seen by that year?
@@ -180,16 +219,12 @@ def branching_distributions(selected_years: List[int],
     a paradigm shift in year n and the branch without it), and then weigh
     the distribution in each branch by the likelihood of being in that branch.
     """
-    first_shift = min(selected_years)
-    sample_time_period = current_year - first_shift
-    n_shifts_base_case = len(selected_years)
-
     num_shifts_probs = [[0.0 for _ in range(num_yrs_forward+1)]
                         for _ in range(num_yrs_forward)]
     for idx_year in range(num_yrs_forward):
         if idx_year == 0:
             # base case: only one branch so far, create 2 branches using Laplace's rule
-            prob_shift = (n_shifts_base_case + 1) / (sample_time_period + 2)
+            prob_shift = laplace_rule_succ_NEW(selected_years, success_rate_func)
             num_shifts_probs[0][1] = prob_shift
             num_shifts_probs[0][0] = 1 - prob_shift
             continue
@@ -198,7 +233,18 @@ def branching_distributions(selected_years: List[int],
         for branch, prob_branch in enumerate(num_shifts_probs[idx_year-1]):
             if prob_branch == 0:
                 continue
-            prob_shift = (n_shifts_base_case + branch + 1) / (sample_time_period + idx_year + 2)
+
+            # ASSUMPTION: in order to keep the number of branches manageable (ie not exponential),
+            # we merge all the branches that have seen the same number of paradigm shifts,
+            # and assume that the paradigm shifts were evenly distributed in them.
+            # Concretely, this means that given S paradigm shifts in T years, we assume
+            # the shifts happened at forall i in [0, S]: (2i+1)T//(2S)
+            branch_shifts = selected_years + [current_year+1 + (((2*i + 1) * idx_year) // (2*branch))
+                                              for i in range(branch)]
+
+            prob_shift = laplace_rule_succ(branch_shifts,
+                                           success_rate_func,
+                                           current_year + idx_year + 1)
             num_shifts_probs[idx_year][branch+1] += prob_branch * prob_shift
             num_shifts_probs[idx_year][branch] += prob_branch * (1 - prob_shift)
         
@@ -212,12 +258,14 @@ num_shifts_probs = branching_distributions(selected_years, num_yrs_forward)
 # Create the plot using Plotly
 fig = go.Figure()
 
-for i, num_events in enumerate(range(len(num_shifts_probs[0]))):
+for n_shifts in range(len(num_shifts_probs[0])):
+    n_shifts_probs = [round(year_data[n_shifts], 3) for year_data in num_shifts_probs]
+
     fig.add_trace(go.Bar(
-        x=[str(current_year+year) for year in range(len(num_shifts_probs))], 
-        y=[round(year_data[i], 3) for year_data in num_shifts_probs], 
-        name=f'{num_events} shifts',
-        showlegend=i<11,
+        x=[str(current_year+year+1) for year in range(len(num_shifts_probs))], 
+        y=n_shifts_probs, 
+        name=f"{n_shifts} shift{'s' if n_shifts != 1 else ''}",
+        showlegend=n_shifts < 14 and max(n_shifts_probs) > 0.02,
     ))
 
 fig.update_layout(
@@ -236,14 +284,16 @@ num_shifts_from_user = st.slider('Number of paradigm shifts', 1, 10, 3)
 prob_of_reaching_num_shifts = [sum(year_probs[num_shifts_from_user:]) for year_probs in num_shifts_probs]
 fig = go.Figure()
 fig.add_trace(go.Bar(
-    x=[str(current_year+year) for year in range(len(num_shifts_probs))],
+    x=[str(current_year+year+1) for year in range(len(num_shifts_probs))],
     y=[round(prob, 3) for prob in prob_of_reaching_num_shifts],
     name=f'{num_shifts_from_user} shifts',
 ))
 fig.update_layout(
-    title=f'Probability of seeing {num_shifts_from_user} paradigm shifts by year',
+    title=f"Probability of seeing {num_shifts_from_user} "
+            + f"paradigm shift{'s' if num_shifts_from_user != 0 else ''} by year",
     xaxis_title='Year',
     yaxis_title='Probability',
 )
 st.plotly_chart(fig)
 # %%
+# TODO check if you get the same results if you run it month-by-month instead of year-by-year
