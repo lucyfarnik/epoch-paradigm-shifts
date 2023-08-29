@@ -1,23 +1,33 @@
 #%%
 import streamlit as st
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from scipy.optimize import curve_fit
 import datetime
 from typing import List, Optional, Callable
 
 #%%
 st.write("""
          # Predictive model of future paradigm shifts
-         Select what you consider to be a paradigm shift in the history of ML.
-         The app will give you a prediction of when you can expect to see the next
-         paradigm shift, based on the [time-invariant Laplace's rule](https://epochai.org/blog/a-time-invariant-version-of-laplace-s-rule).
-
+         This app predicts when the next ML paradigm shifts will occur given your
+         beliefs about which past innovations count as paradigm shifts, as well as
+         the future of the ML field.
+         
          Developed by [Lucy Farnik](https://www.linkedin.com/in/lucy-farnik/),
          [Francesca Sheeka](https://www.linkedin.com/in/fsheeka/),
          and [Pablo Villalobos](https://www.linkedin.com/in/pablo-villalobos-sanchez/).
+         Please send any questions, bug reports, or feature requests to
+         [lucyfarnik@gmail.com](mailto:lucyfarnik@gmail.com).
          """)
 
 #%%
+st.write("""
+         ## Parameter 1: Select paradigm shifts
+         Which innovations would you consider to be a paradigm shift?
+         You can select from the list below, or add your own by typing it in the
+         text box (make sure to include the year in brackets).
+         """)
 if 'paradigm_shifts' not in st.session_state:
     st.session_state.paradigm_shifts = [ #TODO: add more, fact check years
         'Backpropagation (1960)',
@@ -28,7 +38,7 @@ if 'paradigm_shifts' not in st.session_state:
         'Deep Learning (2006)',
         'Generative Adversarial Networks (2014)',
         'Transformers (2017)',
-        'Foundation models (2020)'
+        # 'Foundation models (2020)'
     ]
 
 
@@ -55,126 +65,97 @@ for paradigm_shift in st.session_state.paradigm_shifts:
 #TODO: let people rate the impact of paradigm shifts; adapt the model accordingly
 
 #%%
+st.write("""
+         ## Parameter 2: How far into the future do you want to predict?
+         This effectively just sets the zoom level of the charts.
+         """)
 num_yrs_forward = st.slider('Number of years to predict', 10, 100, 30, 5)
-st.write('---')
 #%%
 current_year = datetime.datetime.now().year
-def get_prediction_dist(selected_years: List[int], num_yrs_forward: int = 30) -> List[float]:
-    # prob of no success during t time = (1+t/T)^{-S} (T = time since first paradigm shift, S = number of paradigm shifts)
-    first_shift = min(selected_years)
-    sample_time_period = current_year - first_shift # T in the formula above
-    n_shifts = len(selected_years) # S in the formula above
-
-    # compute the probabilities
-    prob_shift_cumulative = [1 - (1+i/sample_time_period)**(-n_shifts)
-                             for i in range(1, num_yrs_forward+1)]
-    prob_shift = [prob_shift_cumulative[0]] + [
-        prob_shift_cumulative[i] - prob_shift_cumulative[i-1]
-        for i in range(1, num_yrs_forward)]
-    
-    # distribution over the next num_yrs_forward years, dummy dist for now
-    return pd.DataFrame({
-        'Year': range(current_year, current_year+num_yrs_forward),
-        'Probability': [round(p, 3) for p in prob_shift], # round to 3 decimal places
-        'Cumulative Probability': [round(p, 3) for p in prob_shift_cumulative],
-    })
-
 
 #%%
-st.write("## Next paradigm shift date")
-# Chart options
-show_cumulative = st.checkbox('Show cumulative probability')
+st.write("""
+        ## Parameter 3: How much effort do you expect to go into ML research in the future?
+        It's easy to see that the ML field is growing — over the last 3 decades,
+         the number of arXiv papers published in ML has grown exponentially.
+         Obviously exponential growth cannot last forever. Where do you expect it
+         to plateau? What number of ML papers per year do you think will be the maximum?
 
-#%%
-# get the data
-data = get_prediction_dist(selected_years, num_yrs_forward)
+         (For the math nerds: you are actually choosing the [supremum of the
+         logistic function](https://en.wikipedia.org/wiki/Logistic_function).)
+         """)
 
-#%%
-# compute when the cumulative probabilities surpass certain thresholds 
-cummulative_threshs = []
-for p in [0.1, 0.25, 0.5, 0.75, 0.9]:
-    try:
-        cummulative_threshs.append((p, data[data['Cumulative Probability'] >= p]['Year'].iloc[0]))
-    except IndexError:
-        pass
-# if there are multiple cumulative probability values in the same year,
-# only keep the highest one so that they don't visually overlap
-cummulative_threshs = [cummulative_threshs[i]
-                       for i in range(len(cummulative_threshs))
-                       if i==len(cummulative_threshs)-1 or
-                            cummulative_threshs[i][1] != cummulative_threshs[i+1][1]]
+papers_count_df = pd.read_csv('arxiv_papers_count.csv')
 
-#%%
-# Create the plot using Plotly
+values = []
+
+supremum = st.select_slider('Maximum number of papers per year',
+                            options=[4e4, 5e4, 6e4, 7e4, 8e4, 9e4,
+                                     1e5, 3e5, 5e5, 7e5, 1e6, 5e6, 1e7, 5e7],
+                            value=5e4, format_func=lambda x: f'{x:,.0f}')
+
+def logistic_func_fixed_sup(x, growth, midpoint):
+    return supremum / (1 + np.exp(-growth * (x-midpoint)))
+
+(logistic_growth, logistic_midpoint), _ = curve_fit(logistic_func_fixed_sup,
+                                                    papers_count_df['year'].values,
+                                                    papers_count_df['papers_count'].values,
+                                                    p0=(1, 2020))
+
+x_pred = np.arange(1993, current_year+num_yrs_forward)
 fig = go.Figure()
+fig.add_trace(go.Scatter(x=papers_count_df['year'], y=papers_count_df['papers_count'],
+                         mode='markers', name='Data'))
+fig.add_trace(go.Scatter(x=x_pred,
+                         y=logistic_func_fixed_sup(x_pred, logistic_growth, logistic_midpoint),
+                         mode='lines', name='Fitted Curve'))
 
-# Add a bar chart for yearly probabilities
-fig.add_trace(go.Bar(x=data['Year'], y=data['Probability'],
-                     name='Probability', showlegend=show_cumulative))
+fig.update_layout(title='Data and Fitted Logistic Curve',
+                  xaxis_title='Year', yaxis_title='Number of papers')
 
-if show_cumulative:
-    # Add a line chart for cumulative probabilities
-    fig.add_trace(go.Scatter(x=data['Year'], y=data['Cumulative Probability'],
-                             mode='lines', name='Cumulative Probability'))
-
-chart_height = 1 if show_cumulative else data['Probability'].max()
-for (prob, year) in cummulative_threshs:
-    fig.add_shape(
-        type='line',
-        yref='y', y0=0, y1=chart_height,
-        xref='x', x0=year, x1=year,
-        line=dict(color='red', width=2, dash='dot'),
-    )
-    fig.add_trace(go.Scatter(
-        x=[year],
-        y=[chart_height+0.005],
-        text=[f"{100*prob:.0f}%"],
-        mode="text",
-        showlegend=False
-    ))
-
-# Render the Plotly chart in Streamlit
 st.plotly_chart(fig)
 
 #%%
-# print the year when the cumulative probability of a paradigm shift reach thresholds
-st.write('\n'.join([f"- {p*100}% chance of a paradigm shift by {y}" for p, y in cummulative_threshs]))
-
-#%%
-# show number of paradigm shifts expected by a given year
-num_successes = len(selected_years)
-num_years = current_year - min(selected_years)
 st.write("""
-         ---
-         ## Number of paradigm shifts predicted by a given year
-""")
-num_shifts_by_year = [round(t*num_successes/num_years, 2)
-                      for t in range(num_yrs_forward)]
+         ## Parameter 4: Are ideas getting harder to find? If so, by how much?
+         Some people believe that the "low-hanging fruit" of ML has already been
+         picked, and that future innovations will be harder to find. If you believe
+         this, you can use this parameter to model this. If you don't believe this,
+         you can set this parameter to 0.
 
-#%%
-# print the year when the predicted number of paradigm shifts crosses integer thresholds
-num_shifts_thresh_years = []
-num_shifts_thresh = 1
-for year_offset, num_shifts in enumerate(num_shifts_by_year):
-    if num_shifts >= num_shifts_thresh:
-        num_shifts_thresh_years.append((num_shifts_thresh, current_year + year_offset))
-        num_shifts_thresh += 1
+         (Sidenote: there is a [paper](https://web.stanford.edu/~chadj/IdeaPF.pdf)
+         on this phenomenon in science in general.)
+         """)
+innov_decl_perc = st.slider('In each year, how much harder is it to find new ideas?',
+                            min_value=0., max_value=10., value=2., step=0.1, format='%.1f%%')
 
-st.write('\n'.join([f"- {n} paradigm shifts predicted by {y}" for n, y in num_shifts_thresh_years]))
+st.write("""
+         Here's how that interacts with the growth of ML set in the previous parameter:
+         """)
+def ml_growth_func(x):
+    growth_term = logistic_func_fixed_sup(x, logistic_growth, logistic_midpoint)
+    innov_decl_term = (1 - innov_decl_perc/100)**(x-1993)
+    return growth_term * innov_decl_term
+
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=x_pred, y=ml_growth_func(x_pred), mode='lines', name='ML Growth'))
+fig.add_trace(go.Scatter(x=x_pred,
+                            y=logistic_func_fixed_sup(x_pred, logistic_growth, logistic_midpoint),
+                            mode='lines', name='Original Curve', line=dict(dash='dash')))
+
+fig.update_layout(title='Growth of ML with Innovation Decline',
+                    xaxis_title='Year', yaxis_title='Number of importance-adjusted papers')
+
+st.plotly_chart(fig)
+
 # %%
-st.write("## Probability of seeing a given number of paradigm shifts by year")
+st.write("## Results: Probability of seeing a given number of paradigm shifts by year")
 
-def laplace_rule_succ(num_successes: int, num_trials: int) -> float:
-    """
-    Probability of seeing a new paradigm shift in the next year, given that we've
-    seen num_successes paradigm shifts in num_trials years.
-    """
+st.write("# <span style='color:red'>Warning: the way the ML growth function is incorporated into the model may be wrong - our current curve says that there would be less than 1 ML paper per year prior to 1990.</span>", unsafe_allow_html=True)
 
-    return (num_successes + 1) / (num_trials + 2)
-
-def laplace_rule_succ_NEW(success_years: List[int],
-                          success_rate_func: Optional[Callable] = None,
-                          year_to_predict: int = None) -> float:
+def laplace_rule_succ(success_years: List[int],
+                      success_rate_func: Optional[Callable] = None,
+                      year_to_predict: int = None) -> float:
     """
     Probability of seeing a new paradigm shift in the next year, given a list of
     when each paradigm shift occurred.
@@ -198,8 +179,17 @@ def laplace_rule_succ_NEW(success_years: List[int],
     succ_rate_sum_succ = sum([success_rate_func(yr) for yr in success_years])
     succ_rate_sum = sum([success_rate_func(yr)
                          for yr in range(min(success_years), year_to_predict)])
-    
-    return success_rate_func(year_to_predict) * (succ_rate_sum_succ + 1) / (succ_rate_sum + 2)
+
+
+    # result = success_rate_func(year_to_predict) * (succ_rate_sum_succ + 1) / (succ_rate_sum + 2)
+    #! FIXME
+    result = (succ_rate_sum_succ + 1) / (succ_rate_sum + 2)
+
+    if result < 0 or result > 1:
+        raise ValueError(f'Probability of seeing a new paradigm shift in year {year_to_predict} '
+                         + f'is {result}, which is outside the range [0, 1].')
+
+    return result.item()
 
 # predict number of paradigm shifts by year using branching
 def branching_distributions(selected_years: List[int],
@@ -224,7 +214,7 @@ def branching_distributions(selected_years: List[int],
     for idx_year in range(num_yrs_forward):
         if idx_year == 0:
             # base case: only one branch so far, create 2 branches using Laplace's rule
-            prob_shift = laplace_rule_succ_NEW(selected_years, success_rate_func)
+            prob_shift = laplace_rule_succ(selected_years, success_rate_func)
             num_shifts_probs[0][1] = prob_shift
             num_shifts_probs[0][0] = 1 - prob_shift
             continue
@@ -242,7 +232,7 @@ def branching_distributions(selected_years: List[int],
             branch_shifts = selected_years + [current_year+1 + (((2*i + 1) * idx_year) // (2*branch))
                                               for i in range(branch)]
 
-            prob_shift = laplace_rule_succ_NEW(branch_shifts,
+            prob_shift = laplace_rule_succ(branch_shifts,
                                                success_rate_func,
                                                current_year + idx_year + 1)
             num_shifts_probs[idx_year][branch+1] += prob_branch * prob_shift
@@ -252,7 +242,7 @@ def branching_distributions(selected_years: List[int],
 
 #%%
 # get the data
-success_rate_func = None
+success_rate_func = lambda x: ml_growth_func(x) / 1e4
 num_shifts_probs = branching_distributions(selected_years, success_rate_func, num_yrs_forward)
 
 #%%
@@ -266,7 +256,7 @@ for n_shifts in range(len(num_shifts_probs[0])):
         x=[str(current_year+year+1) for year in range(len(num_shifts_probs))], 
         y=n_shifts_probs, 
         name=f"{n_shifts} shift{'s' if n_shifts != 1 else ''}",
-        showlegend=n_shifts < 14 and max(n_shifts_probs) > 0.02,
+        showlegend=(n_shifts < 14 and max(n_shifts_probs) > 0.02),
     ))
 
 fig.update_layout(
