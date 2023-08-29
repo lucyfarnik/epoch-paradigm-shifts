@@ -242,9 +242,9 @@ def branching_distributions(selected_years: List[int],
             branch_shifts = selected_years + [current_year+1 + (((2*i + 1) * idx_year) // (2*branch))
                                               for i in range(branch)]
 
-            prob_shift = laplace_rule_succ(branch_shifts,
-                                           success_rate_func,
-                                           current_year + idx_year + 1)
+            prob_shift = laplace_rule_succ_NEW(branch_shifts,
+                                               success_rate_func,
+                                               current_year + idx_year + 1)
             num_shifts_probs[idx_year][branch+1] += prob_branch * prob_shift
             num_shifts_probs[idx_year][branch] += prob_branch * (1 - prob_shift)
         
@@ -252,7 +252,8 @@ def branching_distributions(selected_years: List[int],
 
 #%%
 # get the data
-num_shifts_probs = branching_distributions(selected_years, num_yrs_forward)
+success_rate_func = None
+num_shifts_probs = branching_distributions(selected_years, success_rate_func, num_yrs_forward)
 
 #%%
 # Create the plot using Plotly
