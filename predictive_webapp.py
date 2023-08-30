@@ -81,31 +81,44 @@ st.write("""
          Obviously exponential growth cannot last forever. Where do you expect it
          to plateau? What number of ML papers per year do you think will be the maximum?
 
-         (For the math nerds: you are actually choosing the [supremum of the
-         logistic function](https://en.wikipedia.org/wiki/Logistic_function).)
+         For reference, the chart includes the number of ML papers submitted to 
+         arXiv each year from 1993 to 2021. **Important note**: back in the 90s and
+         before, not a lot of people were using arXiv, so the number of papers
+         submitted back then should not inform your views too much.
+         
+         This is why we also provide a parameter to set the minimum number of
+         papers per year in the past — think of it as the number of ML papers
+         published at the time of the first paradigm shift.
+
+         (For the math nerds: you are actually choosing the supremum and infinimum
+         of the logistic function. Once you pick these, the app fits the logistic
+         function onto the data from 2010 onward)
          """)
 
 papers_count_df = pd.read_csv('arxiv_papers_count.csv')
-
-values = []
 
 supremum = st.select_slider('Maximum number of papers per year',
                             options=[4e4, 5e4, 6e4, 7e4, 8e4, 9e4,
                                      1e5, 3e5, 5e5, 7e5, 1e6, 5e6, 1e7, 5e7],
                             value=5e4, format_func=lambda x: f'{x:,.0f}')
+infinimum = st.select_slider('Minimum number of papers per year',
+                            options=[10, 30, 50, 70, 100, 150, 200, 300, 400, 500, 700,
+                                     1000, 1500, 2000, 3000, 4000, 5000, 7000, 10000],
+                            value=500, format_func=lambda x: f'{x:,.0f}')
 
 def logistic_func_fixed_sup(x, growth, midpoint):
-    return supremum / (1 + np.exp(-growth * (x-midpoint)))
+    return (supremum - infinimum) / (1 + np.exp(-growth * (x-midpoint))) + infinimum
 
+papers_2010_onward = papers_count_df[papers_count_df['year'] >= 2010]
 (logistic_growth, logistic_midpoint), _ = curve_fit(logistic_func_fixed_sup,
-                                                    papers_count_df['year'].values,
-                                                    papers_count_df['papers_count'].values,
+                                                    papers_2010_onward['year'].values,
+                                                    papers_2010_onward['papers_count'].values,
                                                     p0=(1, 2020))
 
 x_pred = np.arange(1993, current_year+num_yrs_forward)
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=papers_count_df['year'], y=papers_count_df['papers_count'],
-                         mode='markers', name='Data'))
+                         mode='markers', name='arXiv Papers'))
 fig.add_trace(go.Scatter(x=x_pred,
                          y=logistic_func_fixed_sup(x_pred, logistic_growth, logistic_midpoint),
                          mode='lines', name='Fitted Curve'))
@@ -151,7 +164,7 @@ st.plotly_chart(fig)
 # %%
 st.write("## Results: Probability of seeing a given number of paradigm shifts by year")
 
-st.write("# <span style='color:red'>Warning: the way the ML growth function is incorporated into the model may be wrong - our current curve says that there would be less than 1 ML paper per year prior to 1990.</span>", unsafe_allow_html=True)
+st.write("# <span style='color:red'>Warning: the way the ML growth function is incorporated into the model may be wrong - multiplying by r(t) makes the probability go above 1, so I'm currently skipping that.</span>", unsafe_allow_html=True)
 
 def laplace_rule_succ(success_years: List[int],
                       success_rate_func: Optional[Callable] = None,
