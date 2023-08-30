@@ -160,7 +160,7 @@ st.write("""
          """)
 def ml_growth_func(x):
     growth_term = logistic_func(x)
-    innov_decl_term = (1 - innov_decl_perc/100)**(x-1993)
+    innov_decl_term = (1 - innov_decl_perc/100)**(x-2000)
     return growth_term * innov_decl_term
 
 fig = go.Figure()
@@ -319,9 +319,9 @@ st.write("""
          $$P(Success_t) = r(t) \\frac{\sum r(t_i)x_i + 1}{\sum r(t_i) + 2}$$.
 
          $r(t)$ is the rate of success in year $t$, which in our case is set to
-         the logistic function defined above, multiplied by $(1 - d)^{(t-1993)}$,
-         where $d$ is the rate at which ideas are getting harder to find. It's
-         visualized in the chart in the "ideas getting harder to find" section.
+         the logistic function defined above, multiplied by $(1 - d)^{(t-2000)}$,
+         where $d$ is the rate at which ideas are getting harder to find.
+         It's visualized in the chart in the "ideas getting harder to find" section.
          To make this a valid probability, we normalize r(t) by dividing it by
          its maximum value.
 
