@@ -36,6 +36,7 @@ st.write("""
          You can select from the list below, or add your own by typing it in the
          text box (make sure to include the year in brackets).
          """)
+# initialize the list of paradigm shifts
 if 'paradigm_shifts' not in st.session_state:
     st.session_state.paradigm_shifts = [ #TODO: add more, fact check years
         'Backpropagation (1960)',
@@ -57,7 +58,7 @@ with col1:
 with col2:
     st.write('## ')
     if st.button('Add'):
-        try:
+        try: # validate input
             year = int(custom_paradigm_shift[-5:-1])
             if year > current_year or year < 1000:
                 raise ValueError
@@ -100,15 +101,19 @@ papers_count_df = pd.read_csv('arxiv_papers_count.csv')
 detailed_logistic_control = st.checkbox('I want more detailed control over this function')
 
 if detailed_logistic_control:
+    # manual controls for each parameter of the function
     supremum = st.number_input('Supremum (maximum papers/year)', value=int(4.8e4))
     infinimum = st.number_input('Infinimum (minimum papers/year)', value=500)
     logistic_growth = st.number_input('Growth (higher = steeper)', value=0.55)
     logistic_midpoint = st.number_input('Midpoint (middle of exponential growth)', value=2019)
 else:
+    # magic number of the infinimum, user-selected plateau, the rest is fit to the data
     infinimum = 500
     plateau_year = st.number_input('Plateau Year', min_value=2024, max_value=2063, value=2024)
 
+    # function with explicit parameters that lets us fit it to data
     def logistic_func_fixed_plateau(x, supremum, logistic_growth):
+        # this relationship just works experimentally (since "plateau" is a handwavey concept)
         logistic_midpoint = plateau_year - 2.5/logistic_growth
         return (supremum-infinimum) / (1 + np.exp(-logistic_growth * (x-logistic_midpoint))
                                        ) + infinimum
@@ -117,14 +122,17 @@ else:
     (supremum, logistic_growth), _ = curve_fit(logistic_func_fixed_plateau,
                                                papers_2010_onward['year'].values,
                                                papers_2010_onward['papers_count'].values,
+                                               # initial reasonable values
                                                p0=(1e5*(plateau_year-2023), .5))
     logistic_midpoint = plateau_year - 2.5/logistic_growth
 
+# final function, either with manual or fitted parameters
 def logistic_func(x):
     return (supremum - infinimum) / (1 + np.exp(-logistic_growth * (x-logistic_midpoint))
                                      ) + infinimum
 
 
+# visualize the arXiv submissions data and the fitted curve
 x_pred = np.arange(1993, current_year+num_yrs_forward)
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=papers_count_df['year'], y=papers_count_df['papers_count'],
@@ -149,17 +157,20 @@ st.write("""
          (Sidenote: there is a [paper](https://web.stanford.edu/~chadj/IdeaPF.pdf)
          on this phenomenon in science in general.)
          """)
+# expressed as a percentage
 innov_decl_perc = st.slider('In each year, how much harder is it to find new ideas?',
                             min_value=0., max_value=10., value=0., step=0.1, format='%.1f%%')
 
 st.write("""
          Here's how that interacts with the growth of ML set in the previous parameter:
          """)
+# combines the logistic curve (param 3) with the innovation decline (param 4)
 def ml_growth_func(x):
     growth_term = logistic_func(x)
     innov_decl_term = (1 - innov_decl_perc/100)**(x-2000)
     return growth_term * innov_decl_term
 
+# visual comparison of the two curves (logistic vs logistic with innovation decline)
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=x_pred, y=ml_growth_func(x_pred), mode='lines', name='ML Growth'))
 fig.add_trace(go.Scatter(x=x_pred, y=logistic_func(x_pred),
@@ -190,19 +201,23 @@ def laplace_rule_succ(success_years: List[int],
 
     P(Success_t) = r(t) \\frac{\sum r(t_i)x_i + 1}{\sum r(t_i) + 2}
     """
+    # defaults for optional parameters
     if success_rate_func is None:
         success_rate_func = lambda _: 1
     
     if year_to_predict is None:
         year_to_predict = max(current_year, max(success_years))+1
 
+    # sum r(t_i)x_i
     succ_rate_sum_succ = sum([success_rate_func(yr) for yr in success_years])
+    # sum r(t_i)
     succ_rate_sum = sum([success_rate_func(yr)
                          for yr in range(min(success_years), year_to_predict)])
 
 
     result = success_rate_func(year_to_predict) * (succ_rate_sum_succ + 1) / (succ_rate_sum + 2)
 
+    # validate result (used for testing, should never happen in final version)
     if result < 0 or result > 1:
         raise ValueError(f'Probability of seeing a new paradigm shift in year {year_to_predict} '
                          + f'is {result}, which is outside the range [0, 1].')
@@ -259,17 +274,21 @@ def branching_distributions(selected_years: List[int],
     return num_shifts_probs
 
 #%%
-# get the data
+# normalize the ML growth function
 ml_growth_func_max = max([ml_growth_func(y) for y in range(1900,
                                                            current_year+num_yrs_forward)])
-success_rate_func = lambda year: ml_growth_func(year) / ml_growth_func_max
-num_shifts_probs = branching_distributions(selected_years, success_rate_func, num_yrs_forward)
+ml_growth_normalized = lambda year: ml_growth_func(year) / ml_growth_func_max
+
+# run the algorithm to get the data
+num_shifts_probs = branching_distributions(selected_years, ml_growth_normalized,
+                                           num_yrs_forward)
 
 #%%
-# Create the plot using Plotly
+# Create the plot of the distribution of paradigm shift numbers by year
 fig = go.Figure()
 
 for n_shifts in range(len(num_shifts_probs[0])):
+    # probability of seeing n paradigm shifts in each year
     n_shifts_probs = [round(year_data[n_shifts], 3) for year_data in num_shifts_probs]
 
     fig.add_trace(go.Bar(
@@ -292,19 +311,25 @@ st.plotly_chart(fig)
 st.write("## Probability of seeing a given number of paradigm shifts by year")
 
 num_shifts_from_user = st.slider('How many paradigm shifts do you think we need to get to AGI?', 1, 10, 1)
+# calculate cumulative probability for each year
 prob_of_reaching_num_shifts = [sum(year_probs[num_shifts_from_user:]) for year_probs in num_shifts_probs]
+
+# plot it
 fig = go.Figure()
 fig.add_trace(go.Bar(
     x=[str(current_year+year+1) for year in range(len(num_shifts_probs))],
     y=[round(prob, 3) for prob in prob_of_reaching_num_shifts],
     name=f'{num_shifts_from_user} shifts',
 ))
+
+# add a dashed line for each quartile
 for thresh in [.25, .5, .75]:
     if thresh > max(prob_of_reaching_num_shifts):
         continue
     fig.add_shape(type='line', x0=current_year+1, y0=thresh,
                   x1=current_year+num_yrs_forward, y1=thresh,
                   line=dict(color='Red', dash='dash'))
+
 fig.update_layout(
     title=f"Cumulative probability of seeing {num_shifts_from_user} "
             + f"paradigm shift{'s' if num_shifts_from_user != 1 else ''} by year",
