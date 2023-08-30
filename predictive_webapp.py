@@ -141,7 +141,7 @@ fig.add_trace(go.Scatter(x=x_pred, y=logistic_func(x_pred),
                          mode='lines', name='Fitted Curve'))
 
 fig.update_layout(title='Data and Fitted Logistic Curve',
-                  xaxis_title='Year', yaxis_title='Number of papers')
+                  xaxis_title='Year', yaxis_title='Number of ML papers per year')
 
 st.plotly_chart(fig)
 
