@@ -328,8 +328,8 @@ st.write("""
          To make this a valid probability, we normalize r(t) by dividing it by
          its maximum value.
 
-         $x_i$ is a binary function indicating whether there was a success (ie.
-         a paradigm shift) in year $i$.
+         $x_i$ is a binary indicator of whether there was a success
+         (ie. a paradigm shift) in year $i$.
 
          ### Branching algorithm
          We then use a branching algorithm to predict the number of paradigm shifts
@@ -340,23 +340,24 @@ st.write("""
          and one without (you can think of these as different timelines, Everett
          branches, etc.). Laplace's rule gives us the probability of each branch
          becoming reality.
-         - Then for year $t$, take the branches from year $t-1$, and for each branch,
-         use Laplace's rule to determine the probability of seeing a paradigm shift
-         in year $t$ in this branch. Once this is complete for all branches, merge
-         the branches with the same number of paradigm shifts.
+         - Then for year $t\in[c, c+p]$ where $c$ is the current year and $p$ is
+         the number of years we want to predict, take the branches from year $t-1$,
+         and for each branch, use Laplace's rule to determine the probability
+         of seeing a paradigm shift in year $t$ in this branch. Once this is
+         complete for all branches, merge the branches with the same number of
+         paradigm shifts.
 
-         Note that there are a few simplifying assumptions here, as well as a few
-         imprecisions in the model that we had to introduce to make it computationally
-         tractable. First, we assume that there can never be more than 1 paradigm
-         shift in a year. Second, note that we are merging all the branches that
-         have had the same number of paradigm shifts (this takes the computational
-         complexity of the algorithm down from exponential to quadratic).
-         This means that we do not distinguish between a branch that saw its only
-         paradigm shift in 2025 and a branch that had its only paradigm shift in 2030.
-         This would not make a difference if $r(t)$ was constant, but since it's not,
-         it makes our slightly imprecise. However, note that our modified Laplace's
+         Note that there are a few simplifications here. First, we assume that
+         there can never be more than 1 paradigm shift in a year. Second, note
+         that we are merging all the branches that have had the same number of
+         paradigm shifts (this takes the computational complexity of the algorithm
+         down from exponential to quadratic). This means that we do not distinguish
+         between a branch that saw its only paradigm shift in 2025 and a branch
+         that had its only paradigm shift in 2030.  This would not make a
+         difference if $r(t)$ was constant, but since it's not, it makes our
+         slightly imprecise. Also, note that our modified Laplace's
          rule does actually need to know when the paradigm shifts occurred,
-         so we assume that they were evenly spread out throughout the branch,
+         so we assume that they were evenly spread out throughout the branch's timeline,
          using the formula `[current_year+1 + (((2*i + 1) * idx_year) // (2*n_shifts_in_branch))
          for i in range(n_shifts_in_branch)]`.
          """)
