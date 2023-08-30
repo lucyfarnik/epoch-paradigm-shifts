@@ -109,7 +109,7 @@ if detailed_logistic_control:
 else:
     # magic number of the infinimum, user-selected plateau, the rest is fit to the data
     infinimum = 500
-    plateau_year = st.number_input('Plateau Year', min_value=2024, max_value=2063, value=2024)
+    plateau_year = st.number_input('Plateau Year', min_value=2024, max_value=2062, value=2024)
 
     # function with explicit parameters that lets us fit it to data
     def logistic_func_fixed_plateau(x, supremum, logistic_growth):
