@@ -21,9 +21,9 @@ st.write("""
          [lucyfarnik@gmail.com](mailto:lucyfarnik@gmail.com). The code is on
          [GitHub](https://github.com/lucyfarnik/epoch-paradigm-shifts/blob/main/predictive_webapp.py).
 
-         We've done our best to avoid anchoring you by removing the default values
-         in all the parameters. If you think there's a better way to combat anchoring,
-         please let us know.
+         We've done our best to avoid anchoring you by either removing the
+         default values in the parameters, or using "null-values". If you think
+         there's a better way to combat anchoring, please let us know.
          """)
 
 #%%
