@@ -302,6 +302,12 @@ fig.add_trace(go.Bar(
     y=[round(prob, 3) for prob in prob_of_reaching_num_shifts],
     name=f'{num_shifts_from_user} shifts',
 ))
+for thresh in [.25, .5, .75]:
+    if thresh > max(prob_of_reaching_num_shifts):
+        continue
+    fig.add_shape(type='line', x0=current_year+1, y0=thresh,
+                  x1=current_year+num_yrs_forward, y1=thresh,
+                  line=dict(color='Red', dash='dash'))
 fig.update_layout(
     title=f"Probability of seeing {num_shifts_from_user} "
             + f"paradigm shift{'s' if num_shifts_from_user != 0 else ''} by year",
