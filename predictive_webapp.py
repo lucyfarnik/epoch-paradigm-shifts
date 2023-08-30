@@ -18,7 +18,8 @@ st.write("""
          [Francesca Sheeka](https://www.linkedin.com/in/fsheeka/),
          and [Pablo Villalobos](https://www.linkedin.com/in/pablo-villalobos-sanchez/).
          Please send any questions, bug reports, or feature requests to
-         [lucyfarnik@gmail.com](mailto:lucyfarnik@gmail.com).
+         [lucyfarnik@gmail.com](mailto:lucyfarnik@gmail.com). The code is on
+         [GitHub](https://github.com/lucyfarnik/epoch-paradigm-shifts/blob/main/predictive_webapp.py).
 
          We've done our best to avoid anchoring you by removing the default values
          in all the parameters. If you think there's a better way to combat anchoring,
