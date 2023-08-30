@@ -99,30 +99,41 @@ st.write("""
 
 papers_count_df = pd.read_csv('arxiv_papers_count.csv')
 
-supremum = st.select_slider('Maximum number of papers per year',
-                            options=[4e4, 5e4, 6e4, 7e4, 8e4, 9e4,
-                                     1e5, 3e5, 5e5, 7e5, 1e6, 5e6, 1e7, 5e7],
-                            value=5e4, format_func=lambda x: f'{x:,.0f}')
-infinimum = st.select_slider('Minimum number of papers per year',
-                            options=[10, 30, 50, 70, 100, 150, 200, 300, 400, 500, 700,
-                                     1000, 1500, 2000, 3000, 4000, 5000, 7000, 10000],
-                            value=500, format_func=lambda x: f'{x:,.0f}')
+detailed_logistic_control = st.checkbox('I want more detailed control over this function')
 
-def logistic_func_fixed_sup(x, growth, midpoint):
-    return (supremum - infinimum) / (1 + np.exp(-growth * (x-midpoint))) + infinimum
+if detailed_logistic_control:
+    supremum = st.number_input('Supremum', value=int(1e5))
+    infinimum = st.number_input('Infinimum', value=500)
+    logistic_growth = st.number_input('Growth', value=0.35)
+    logistic_midpoint = st.number_input('Midpoint', value=2023)
+else:
+    supremum = st.select_slider('Maximum number of papers per year',
+                                options=[4e4, 5e4, 6e4, 7e4, 8e4, 9e4,
+                                        1e5, 3e5, 5e5, 7e5, 1e6, 5e6, 1e7, 5e7],
+                                value=1e5, format_func=lambda x: f'{x:,.0f}')
+    infinimum = st.select_slider('Minimum number of papers per year',
+                                options=[10, 30, 50, 70, 100, 150, 200, 300, 400, 500, 700,
+                                        1000, 1500, 2000, 3000, 4000, 5000, 7000, 10000],
+                                value=500, format_func=lambda x: f'{x:,.0f}')
 
-papers_2010_onward = papers_count_df[papers_count_df['year'] >= 2010]
-(logistic_growth, logistic_midpoint), _ = curve_fit(logistic_func_fixed_sup,
-                                                    papers_2010_onward['year'].values,
-                                                    papers_2010_onward['papers_count'].values,
-                                                    p0=(1, 2020))
+    def logistic_func_fixed_sup(x, growth, midpoint):
+        return (supremum - infinimum) / (1 + np.exp(-growth * (x-midpoint))) + infinimum
+
+    papers_2010_onward = papers_count_df[papers_count_df['year'] >= 2010]
+    (logistic_growth, logistic_midpoint), _ = curve_fit(logistic_func_fixed_sup,
+                                                        papers_2010_onward['year'].values,
+                                                        papers_2010_onward['papers_count'].values,
+                                                        p0=(1, 2020))
+    
+def logistic_func(x):
+    return (supremum - infinimum) / (1 + np.exp(-logistic_growth * (x-logistic_midpoint))) + infinimum
+
 
 x_pred = np.arange(1993, current_year+num_yrs_forward)
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=papers_count_df['year'], y=papers_count_df['papers_count'],
                          mode='markers', name='arXiv Papers'))
-fig.add_trace(go.Scatter(x=x_pred,
-                         y=logistic_func_fixed_sup(x_pred, logistic_growth, logistic_midpoint),
+fig.add_trace(go.Scatter(x=x_pred, y=logistic_func(x_pred),
                          mode='lines', name='Fitted Curve'))
 
 fig.update_layout(title='Data and Fitted Logistic Curve',
@@ -142,21 +153,20 @@ st.write("""
          on this phenomenon in science in general.)
          """)
 innov_decl_perc = st.slider('In each year, how much harder is it to find new ideas?',
-                            min_value=0., max_value=10., value=2., step=0.1, format='%.1f%%')
+                            min_value=0., max_value=10., value=1.5, step=0.1, format='%.1f%%')
 
 st.write("""
          Here's how that interacts with the growth of ML set in the previous parameter:
          """)
 def ml_growth_func(x):
-    growth_term = logistic_func_fixed_sup(x, logistic_growth, logistic_midpoint)
+    growth_term = logistic_func(x)
     innov_decl_term = (1 - innov_decl_perc/100)**(x-1993)
     return growth_term * innov_decl_term
 
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=x_pred, y=ml_growth_func(x_pred), mode='lines', name='ML Growth'))
-fig.add_trace(go.Scatter(x=x_pred,
-                            y=logistic_func_fixed_sup(x_pred, logistic_growth, logistic_midpoint),
-                            mode='lines', name='Original Curve', line=dict(dash='dash')))
+fig.add_trace(go.Scatter(x=x_pred, y=logistic_func(x_pred),
+                         mode='lines', name='Original Curve', line=dict(dash='dash')))
 
 fig.update_layout(title='Growth of ML with Innovation Decline',
                     xaxis_title='Year', yaxis_title='Number of importance-adjusted papers')
