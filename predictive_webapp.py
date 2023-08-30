@@ -22,6 +22,9 @@ st.write("""
          """)
 
 #%%
+current_year = datetime.datetime.now().year
+
+#%%
 st.write("""
          ## Parameter 1: Select paradigm shifts
          Which innovations would you consider to be a paradigm shift?
@@ -51,6 +54,8 @@ with col2:
     if st.button('Add'):
         try:
             year = int(custom_paradigm_shift[-5:-1])
+            if year > current_year or year < 1000:
+                raise ValueError
             st.session_state.paradigm_shifts.append(custom_paradigm_shift)
         except ValueError:
             st.error('Please enter a valid year in the brackets')
@@ -70,9 +75,6 @@ st.write("""
          This effectively just sets the zoom level of the charts.
          """)
 num_yrs_forward = st.slider('Number of years to predict', 10, 100, 30, 5)
-#%%
-current_year = datetime.datetime.now().year
-
 #%%
 st.write("""
         ## Parameter 3: How much effort do you expect to go into ML research in the future?
@@ -164,10 +166,8 @@ st.plotly_chart(fig)
 # %%
 st.write("## Results: Probability of seeing a given number of paradigm shifts by year")
 
-st.write("# <span style='color:red'>Warning: the way the ML growth function is incorporated into the model may be wrong - multiplying by r(t) makes the probability go above 1, so I'm currently skipping that.</span>", unsafe_allow_html=True)
-
 def laplace_rule_succ(success_years: List[int],
-                      success_rate_func: Optional[Callable] = None,
+                      success_rate_func: Optional[Callable[[int], float]] = None,
                       year_to_predict: int = None) -> float:
     """
     Probability of seeing a new paradigm shift in the next year, given a list of
@@ -194,9 +194,7 @@ def laplace_rule_succ(success_years: List[int],
                          for yr in range(min(success_years), year_to_predict)])
 
 
-    # result = success_rate_func(year_to_predict) * (succ_rate_sum_succ + 1) / (succ_rate_sum + 2)
-    #! FIXME
-    result = (succ_rate_sum_succ + 1) / (succ_rate_sum + 2)
+    result = success_rate_func(year_to_predict) * (succ_rate_sum_succ + 1) / (succ_rate_sum + 2)
 
     if result < 0 or result > 1:
         raise ValueError(f'Probability of seeing a new paradigm shift in year {year_to_predict} '
@@ -206,7 +204,7 @@ def laplace_rule_succ(success_years: List[int],
 
 # predict number of paradigm shifts by year using branching
 def branching_distributions(selected_years: List[int],
-                            success_rate_func: Optional[Callable] = None,
+                            success_rate_func: Optional[Callable[[int], float]] = None,
                             num_yrs_forward: int = 30) -> List[List[float]]:
     """
     In any given year, how many paradigm shifts will we have seen by that year?
@@ -255,7 +253,9 @@ def branching_distributions(selected_years: List[int],
 
 #%%
 # get the data
-success_rate_func = lambda x: ml_growth_func(x) / 1e4
+ml_growth_func_max = max([ml_growth_func(y) for y in range(1900,
+                                                           current_year+num_yrs_forward)])
+success_rate_func = lambda year: ml_growth_func(year) / ml_growth_func_max
 num_shifts_probs = branching_distributions(selected_years, success_rate_func, num_yrs_forward)
 
 #%%
@@ -301,3 +301,49 @@ fig.update_layout(
 st.plotly_chart(fig)
 # %%
 # TODO check if you get the same results if you run it month-by-month instead of year-by-year
+st.write("""
+         ## Appendix: How the model works
+         ### Modified Laplace's rule of succession
+         The core of the model is Laplace's rule of succession, modified to account
+         for a non-constant probability of success:
+         $$P(Success_t) = r(t) \\frac{\sum r(t_i)x_i + 1}{\sum r(t_i) + 2}$$.
+
+         $r(t)$ is the rate of success in year $t$, which in our case is set to
+         the logistic function defined above, multiplied by $(1 - d)^{(t-1993)}$,
+         where $d$ is the rate at which ideas are getting harder to find. It's
+         visualized in the chart in the "ideas getting harder to find" section.
+         To make this a valid probability, we normalize r(t) by dividing it by
+         its maximum value.
+
+         $x_i$ is a binary function indicating whether there was a success (ie.
+         a paradigm shift) in year $i$.
+
+         ### Branching algorithm
+         We then use a branching algorithm to predict the number of paradigm shifts
+         in each year. It works as follows:
+         - In the first year, there is only one branch, so we apply Laplace's rule
+         to figure out the probability of seeing a paradigm shift in that year.
+         This gives us two "branches" — one with a paradigm shift in the first year,
+         and one without (you can think of these as different timelines, Everett
+         branches, etc.). Laplace's rule gives us the probability of each branch
+         becoming reality.
+         - Then for year $t$, take the branches from year $t-1$, and for each branch,
+         use Laplace's rule to determine the probability of seeing a paradigm shift
+         in year $t$ in this branch. Once this is complete for all branches, merge
+         the branches with the same number of paradigm shifts.
+
+         Note that there are a few simplifying assumptions here, as well as a few
+         imprecisions in the model that we had to introduce to make it computationally
+         tractable. First, we assume that there can never be more than 1 paradigm
+         shift in a year. Second, note that we are merging all the branches that
+         have had the same number of paradigm shifts (this takes the computational
+         complexity of the algorithm down from exponential to quadratic).
+         This means that we do not distinguish between a branch that saw its only
+         paradigm shift in 2025 and a branch that had its only paradigm shift in 2030.
+         This would not make a difference if $r(t)$ was constant, but since it's not,
+         it makes our slightly imprecise. However, note that our modified Laplace's
+         rule does actually need to know when the paradigm shifts occurred,
+         so we assume that they were evenly spread out throughout the branch,
+         using the formula `[current_year+1 + (((2*i + 1) * idx_year) // (2*n_shifts_in_branch))
+         for i in range(n_shifts_in_branch)]`.
+         """)
