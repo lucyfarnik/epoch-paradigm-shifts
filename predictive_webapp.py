@@ -19,6 +19,10 @@ st.write("""
          and [Pablo Villalobos](https://www.linkedin.com/in/pablo-villalobos-sanchez/).
          Please send any questions, bug reports, or feature requests to
          [lucyfarnik@gmail.com](mailto:lucyfarnik@gmail.com).
+
+         We've done our best to avoid anchoring you by removing the default values
+         in all the parameters. If you think there's a better way to combat anchoring,
+         please let us know.
          """)
 
 #%%
@@ -80,21 +84,14 @@ st.write("""
         ## Parameter 3: How much effort do you expect to go into ML research in the future?
         It's easy to see that the ML field is growing — over the last 3 decades,
          the number of arXiv papers published in ML has grown exponentially.
-         Obviously exponential growth cannot last forever. Where do you expect it
-         to plateau? What number of ML papers per year do you think will be the maximum?
+         Obviously exponential growth cannot last forever (it would be be over
+         1 billion ML papers per year by 2063). When do you expect it
+         to plateau?
 
          For reference, the chart includes the number of ML papers submitted to 
-         arXiv each year from 1993 to 2021. **Important note**: back in the 90s and
-         before, not a lot of people were using arXiv, so the number of papers
+         arXiv each year from 1993 to 2021. **Important note**: before 2000,
+         not a lot of people were using arXiv, so the number of papers
          submitted back then should not inform your views too much.
-         
-         This is why we also provide a parameter to set the minimum number of
-         papers per year in the past — think of it as the number of ML papers
-         published at the time of the first paradigm shift.
-
-         (For the math nerds: you are actually choosing the supremum and infinimum
-         of the logistic function. Once you pick these, the app fits the logistic
-         function onto the data from 2010 onward)
          """)
 
 papers_count_df = pd.read_csv('arxiv_papers_count.csv')
@@ -102,31 +99,29 @@ papers_count_df = pd.read_csv('arxiv_papers_count.csv')
 detailed_logistic_control = st.checkbox('I want more detailed control over this function')
 
 if detailed_logistic_control:
-    supremum = st.number_input('Supremum', value=int(1e5))
-    infinimum = st.number_input('Infinimum', value=500)
-    logistic_growth = st.number_input('Growth', value=0.35)
-    logistic_midpoint = st.number_input('Midpoint', value=2023)
+    supremum = st.number_input('Supremum (maximum papers/year)', value=int(4.8e4))
+    infinimum = st.number_input('Infinimum (minimum papers/year)', value=500)
+    logistic_growth = st.number_input('Growth (higher = steeper)', value=0.55)
+    logistic_midpoint = st.number_input('Midpoint (middle of exponential growth)', value=2019)
 else:
-    supremum = st.select_slider('Maximum number of papers per year',
-                                options=[4e4, 5e4, 6e4, 7e4, 8e4, 9e4,
-                                        1e5, 3e5, 5e5, 7e5, 1e6, 5e6, 1e7, 5e7],
-                                value=1e5, format_func=lambda x: f'{x:,.0f}')
-    infinimum = st.select_slider('Minimum number of papers per year',
-                                options=[10, 30, 50, 70, 100, 150, 200, 300, 400, 500, 700,
-                                        1000, 1500, 2000, 3000, 4000, 5000, 7000, 10000],
-                                value=500, format_func=lambda x: f'{x:,.0f}')
+    infinimum = 500
+    plateau_year = st.number_input('Plateau Year', min_value=2024, max_value=2063, value=2024)
 
-    def logistic_func_fixed_sup(x, growth, midpoint):
-        return (supremum - infinimum) / (1 + np.exp(-growth * (x-midpoint))) + infinimum
+    def logistic_func_fixed_plateau(x, supremum, logistic_growth):
+        logistic_midpoint = plateau_year - 2.5/logistic_growth
+        return (supremum-infinimum) / (1 + np.exp(-logistic_growth * (x-logistic_midpoint))
+                                       ) + infinimum
 
     papers_2010_onward = papers_count_df[papers_count_df['year'] >= 2010]
-    (logistic_growth, logistic_midpoint), _ = curve_fit(logistic_func_fixed_sup,
-                                                        papers_2010_onward['year'].values,
-                                                        papers_2010_onward['papers_count'].values,
-                                                        p0=(1, 2020))
-    
+    (supremum, logistic_growth), _ = curve_fit(logistic_func_fixed_plateau,
+                                               papers_2010_onward['year'].values,
+                                               papers_2010_onward['papers_count'].values,
+                                               p0=(1e5*(plateau_year-2023), .5))
+    logistic_midpoint = plateau_year - 2.5/logistic_growth
+
 def logistic_func(x):
-    return (supremum - infinimum) / (1 + np.exp(-logistic_growth * (x-logistic_midpoint))) + infinimum
+    return (supremum - infinimum) / (1 + np.exp(-logistic_growth * (x-logistic_midpoint))
+                                     ) + infinimum
 
 
 x_pred = np.arange(1993, current_year+num_yrs_forward)
@@ -146,14 +141,15 @@ st.write("""
          ## Parameter 4: Are ideas getting harder to find? If so, by how much?
          Some people believe that the "low-hanging fruit" of ML has already been
          picked, and that future innovations will be harder to find. If you believe
-         this, you can use this parameter to model this. If you don't believe this,
-         you can set this parameter to 0.
+         this, you can use this parameter to model this.
+         
+         If you don't believe this, you can keep this parameter at 0.
 
          (Sidenote: there is a [paper](https://web.stanford.edu/~chadj/IdeaPF.pdf)
          on this phenomenon in science in general.)
          """)
 innov_decl_perc = st.slider('In each year, how much harder is it to find new ideas?',
-                            min_value=0., max_value=10., value=1.5, step=0.1, format='%.1f%%')
+                            min_value=0., max_value=10., value=0., step=0.1, format='%.1f%%')
 
 st.write("""
          Here's how that interacts with the growth of ML set in the previous parameter:
@@ -294,7 +290,7 @@ st.plotly_chart(fig)
 #%%
 st.write("## Probability of seeing a given number of paradigm shifts by year")
 
-num_shifts_from_user = st.slider('Number of paradigm shifts', 1, 10, 3)
+num_shifts_from_user = st.slider('How many paradigm shifts do you think we need to get to AGI?', 1, 10, 1)
 prob_of_reaching_num_shifts = [sum(year_probs[num_shifts_from_user:]) for year_probs in num_shifts_probs]
 fig = go.Figure()
 fig.add_trace(go.Bar(
@@ -309,8 +305,8 @@ for thresh in [.25, .5, .75]:
                   x1=current_year+num_yrs_forward, y1=thresh,
                   line=dict(color='Red', dash='dash'))
 fig.update_layout(
-    title=f"Probability of seeing {num_shifts_from_user} "
-            + f"paradigm shift{'s' if num_shifts_from_user != 0 else ''} by year",
+    title=f"Cumulative probability of seeing {num_shifts_from_user} "
+            + f"paradigm shift{'s' if num_shifts_from_user != 1 else ''} by year",
     xaxis_title='Year',
     yaxis_title='Probability',
 )
