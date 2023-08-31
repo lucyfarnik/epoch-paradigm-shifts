@@ -86,7 +86,7 @@ st.write("""
         ## Parameter 3: How much effort do you expect to go into ML research in the future?
         It's easy to see that the ML field is growing — over the last 3 decades,
          the number of arXiv papers published in ML has grown exponentially.
-         Obviously exponential growth cannot last forever (it would be be over
+         Obviously exponential growth cannot last forever (it would be over
          1 billion ML papers per year by 2063). When do you expect it
          to plateau?
 
