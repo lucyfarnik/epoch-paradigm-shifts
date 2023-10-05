@@ -134,10 +134,8 @@ def logistic_func(x):
     return (supremum - infinimum) / (1 + np.exp(-logistic_growth * (x-logistic_midpoint))
                                      ) + infinimum
 
-# TODO let the user create a curve representing what percentage of research done in a given year was "basic research" (ie likely to contribute to paradigm shifts)
-
 # visualize the arXiv submissions data and the fitted curve
-x_pred = np.arange(1993, current_year+num_yrs_forward+1)
+x_pred = np.arange(min(selected_years), current_year+num_yrs_forward+1)
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=papers_count_df['year'], y=papers_count_df['papers_count'],
                          mode='markers', name='arXiv Papers'))
@@ -186,6 +184,57 @@ fig.update_layout(title='Growth of ML with Innovation Decline',
 st.plotly_chart(fig)
 
 # %%
+st.write("""
+         ## Parameter 5: How much of ML research is "fundamental"?
+         Some people believe that in the early days, nearly all ML research was
+         focused on the fundamental ideas in a way which was conducive to discovering
+         new paradigms, while in recent years research may be more focused on
+         applying existing techniques to new problems or making small incremental
+         improvements. Obviously there is a spectrum between "fundamental" and
+         "non-fundamental" research, and it's also fairly subjective, but we
+         simplify this to a simple binary — either a paper is "fundamental" or
+         it isn't. Under this simplification, what percentage of research in a
+         given year do you believe is "fundamental"?
+
+         If you don't believe this argument, keep this parameters as is.
+         """)
+fundamental_decline_rate = st.slider('In each year, how much less fundamental is research?',
+                                     min_value=0., max_value=2., value=0., step=0.1, format='%.1f%%')
+fundamental2000 = st.slider('In 2000, what percentage of research was fundamental?',
+                            min_value=0., max_value=100., value=100., step=1., format='%.0f%%')
+
+def fundamental_research_perc(x):
+    perc = 0.01 * (fundamental2000 - fundamental_decline_rate * (x-2000))
+    return np.clip(perc, 0, 1)
+
+# Show the curve of fundamental research percentage
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=x_pred, y=fundamental_research_perc(x_pred),
+                         mode='lines', name='Fundamental Research Percentage'))
+
+fig.update_layout(title='Fundamental Research Percentage',
+                  xaxis_title='Year', yaxis_title='Percentage of research that is fundamental',
+                  yaxis=dict(range=[0, 1], tickformat=',.0%'))
+
+st.plotly_chart(fig)
+
+def fundamental_ml_curve(x):
+    return ml_growth_func(x) * fundamental_research_perc(x)
+
+st.write("Here's how this affects the curve of effort going into fundamental ML research:")
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=x_pred, y=fundamental_ml_curve(x_pred), mode='lines',
+                         name='Fundamental ML Research'))
+fig.add_trace(go.Scatter(x=x_pred, y=ml_growth_func(x_pred),
+                         mode='lines', name='All ML Research', line=dict(dash='dash')))
+
+fig.update_layout(title='Growth of ML with Relative Decline in Fundamental Research',
+                    xaxis_title='Year', yaxis_title='Number of importance-adjusted papers')
+
+st.plotly_chart(fig)
+
+
+# %%
 st.write("## Results: Probability of seeing a given number of paradigm shifts by year")
 
 def poisson(success_years: List[int],
@@ -201,7 +250,10 @@ def poisson(success_years: List[int],
         shift_results = []
         for yr in range(current_year, current_year+num_years+1):
             lambd = rate_scalar * success_rate_func(yr) * (yr - current_year)
-            shift_results.append(lambd**n_shifts * np.exp(-lambd) / math.factorial(n_shifts))
+            shift_prob = lambd**n_shifts * np.exp(-lambd) / math.factorial(n_shifts)
+            if hasattr(shift_prob, 'item'): # convert numpy float to regular float
+                shift_prob = shift_prob.item()
+            shift_results.append(shift_prob)
 
         results.append(shift_results)
     lambd = rate_scalar * success_rate_func(yr) * (yr - current_year)
@@ -211,8 +263,7 @@ def poisson(success_years: List[int],
 #%%
 # run the algorithm to get the data
 x_vals = list(range(current_year, current_year + num_yrs_forward + 1))
-num_shifts_data = poisson(selected_years, ml_growth_func,
-                                           num_yrs_forward)
+num_shifts_data = poisson(selected_years, fundamental_ml_curve, num_yrs_forward)
 
 #%%
 # Create the plot of the distribution of paradigm shift numbers by year
@@ -222,7 +273,7 @@ for n_shifts, shift_data in enumerate(num_shifts_data):
         x=x_vals, 
         y=shift_data, 
         name=f"{n_shifts} shift{'s' if n_shifts != 1 else ''}",
-        # showlegend=max(shift_data) > 0.02,
+        showlegend=max(shift_data) > 0.02,
     ))
 
 fig.update_layout(
